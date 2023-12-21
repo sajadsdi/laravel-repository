@@ -2,6 +2,12 @@
     "name": "sajadsdi/laravel-repository",
     "description": "Advanced Tools to use repository pattern for laravel eloquent models.",
     "type": "library",
+    "keywords": [
+        "laravel",
+        "package",
+        "repository pattern",
+        "eloquent"
+    ],
     "license": "MIT",
     "autoload": {
         "psr-4": {
