@@ -142,8 +142,9 @@ abstract class Repository
      */
     protected function resetQuery(): void
     {
-        $this->query  = null;
-        $this->joined = false;
+        $this->query   = null;
+        $this->joins   = [];
+        $this->selects = [];
     }
 
     /**
@@ -180,6 +181,20 @@ abstract class Repository
     public function paginate(int $perPage = 15): LengthAwarePaginator
     {
         return $this->query()->paginate($perPage)->appends(['search' => $this->search, 'filter' => $this->filter, 'sort' => $this->sort]);
+    }
+
+
+    /**
+     * @param string $column
+     * @return string
+     */
+    private function getColumn(string $column): string
+    {
+        if (!str_contains($column, '.')) {
+            $column = $this->model()->getTable() . '.' . $column;
+        }
+
+        return $column;
     }
 
 }

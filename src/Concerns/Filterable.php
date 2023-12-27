@@ -85,6 +85,8 @@ trait Filterable
      */
     private function setFullFilter(string $column, string $query): void
     {
+        $column = $this->getColumn($column);
+
         $filter = explode('_', $query);
 
         if (count($filter) > 1) {

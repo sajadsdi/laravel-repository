@@ -11,42 +11,28 @@ trait Joinable
     protected array $joinable = [];
 
     /**
-     * is set join query.
-     * @var bool
+     * Stored relations.
+     * @var array
      */
-    private bool $joined = false;
-
+    private array $relations = [];
 
     /**
-     * Interprets and applies a complex filter condition to the query builder instance.
-     * If joining is required for the filter condition, it will perform the necessary table join.
-     *
-     * @param string $column The column name to apply the filter condition to (e.g., "users.name")
-     * @param string $filter The filter condition in the format 'filterType_value'
-     *
-     * @return void
+     * Stored aliases.
+     * @var array
      */
-    private function setJoinFilter(string $column, string $filter): void
-    {
-        $eColumn  = explode('.', $column);
-        $joinable = $this->getJoinable();
+    private array $aliases = [];
 
-        if (!empty($eColumn[0]) && !empty($eColumn[1]) &&
-            !empty($joinable[$eColumn[0]]['rel']) &&
-            !empty($joinable[$eColumn[0]]['filterable']) &&
-            is_array($joinable[$eColumn[0]]['rel']) &&
-            is_array($joinable[$eColumn[0]]['filterable']) &&
-            in_array($eColumn[1], $joinable[$eColumn[0]]['filterable'])
-        ) {
-            $relation = $this->getRelation($joinable[$eColumn[0]]['rel']);
+    /**
+     * Stored joined tables.
+     * @var array
+     */
+    private array $joins = [];
 
-            $this->join($eColumn[0]);
-
-            if ($this->joined) {
-                $this->setFullFilter($relation[count($relation) - 1]['tables'][1] . '.' . $eColumn[1], $filter);
-            }
-        }
-    }
+    /**
+     * store all selects on joins.
+     * @var array
+     */
+    private array $selects = [];
 
     /**
      * Perform a join operation with another table based on the relation configuration.
@@ -62,40 +48,44 @@ trait Joinable
     {
         $joinable = $this->getJoinable();
 
-        if (!isset($joinable[$relation]['rel'])) {
-            return $this;
-        }
-
-        $rels  = $this->getRelation($joinable[$relation]['rel']);
+        $rels  = $this->getRelation($relation);
         $count = count($rels);
 
         if ($count >= 1) {
             $query = $this->query();
 
-            $query->select($joinable[$relation]['select'] ?? '*');
+            if ($select = $this->getMergedSelects($joinable[$relation]['select'] ?? [])) {
+                $query->select($select);
+            }
+
+            $rels[0]['tables'][0] = $this->model()->getTable();
 
             for ($i = 0; $i < $count; $i++) {
-                $this->joined = true;
 
-                $query->join($rels[$i]['tables'][1],
-                    $rels[$i]['tables'][0] . '.' . $rels[$i]['keys'][0],
-                    '=',
-                    $rels[$i]['tables'][1] . '.' . $rels[$i]['keys'][1]
-                );
+                if (!in_array($rels[$i]['tables'][1], $this->joins)) {
 
-                $softDelete = $joinable[$relation]['soft_delete'] ?? [];
+                    $this->joins[] = $rels[$i]['tables'][1];
 
-                if (is_array($softDelete)) {
-                    if (in_array($rels[$i]['tables'][0], $softDelete)) {
-                        $query->whereNull($rels[$i]['tables'][0] . '.' . 'deleted_at');
+                    $query->join($rels[$i]['tables'][1],
+                        $rels[$i]['tables'][0] . '.' . $rels[$i]['keys'][0],
+                        '=',
+                        $rels[$i]['tables'][1] . '.' . $rels[$i]['keys'][1]
+                    );
+
+                    $softDelete = $joinable[$relation]['soft_delete'] ?? [];
+
+                    if (is_array($softDelete)) {
+                        if ($i != 0 && in_array($rels[$i]['tables'][0], $softDelete)) {
+                            $query->whereNull($rels[$i]['tables'][0] . '.' . 'deleted_at');
+                        }
+
+                        if (in_array($rels[$i]['tables'][1], $softDelete)) {
+                            $query->whereNull($rels[$i]['tables'][1] . '.' . 'deleted_at');
+                        }
                     }
 
-                    if (in_array($rels[$i]['tables'][1], $softDelete)) {
-                        $query->whereNull($rels[$i]['tables'][1] . '.' . 'deleted_at');
-                    }
+                    $this->setQuery($query);
                 }
-
-                $this->setQuery($query);
             }
         }
 
@@ -115,32 +105,77 @@ trait Joinable
     /**
      * Resolve the table relationships required for a join operation.
      * This method interprets the 'rel' on joinable property configuration array and constructs an array of table relationships
-     * that includes pairs of tables and their respective keys to be used in join clauses. The method ensures
+     * that include pairs of tables and their respective keys to be used in join clauses. The method ensures
      * that each defined relationship adheres to the expected [table1.field1 => table2.field2] syntax and transforms
      * it into a standardized array structure convenient for iterating over when building join clauses.
      *
-     * @param array $rel An array defining relationships between tables, in the format ['table1.field1' => 'table2.field2'].
-     *
+     * @param string $name relation name defined on joinable
      * @return array An array of associations, where each association is an array with 'tables' and 'keys' keys.
      *               Each 'tables' array contains two table names, and each 'keys' array contains the respective fields for joining.
      */
-    protected function getRelation(array $rel): array
+    protected function getRelation(string $name): array
     {
+        if (isset($this->relations[$name])) {
+            return $this->relations[$name];
+        }
+
         $relation = [];
 
-        foreach ($rel as $table1 => $table2) {
-            $eTable1 = explode('.', $table1);
-            $eTable2 = explode('.', $table2);
+        $joinable = $this->getJoinable();
 
-            if (!empty($eTable1[0]) && !empty($eTable1[1]) && !empty($eTable2[0]) && !empty($eTable2[1])) {
-                $relation[] = [
-                    'tables' => [$eTable1[0], $eTable2[0]],
-                    'keys'   => [$eTable1[1], $eTable2[1]]
-                ];
+        if (isset($joinable[$name]['rel'])) {
+
+            foreach ($joinable[$name]['rel'] as $table1 => $table2) {
+                $eTable1 = explode('.', $table1);
+                $eTable2 = explode('.', $table2);
+
+                if (!empty($eTable1[0]) && !empty($eTable1[1]) && !empty($eTable2[0]) && !empty($eTable2[1])) {
+                    $relation[] = [
+                        'tables' => [$eTable1[0], $eTable2[0]],
+                        'keys'   => [$eTable1[1], $eTable2[1]]
+                    ];
+                }
             }
+
+            if ($relation) {
+                $this->relations[$name] = $relation;
+            }
+
         }
 
         return $relation;
+    }
+
+    /**
+     * Interprets and applies a complex filter condition to the query builder instance.
+     * If joining is required for the filter condition, it will perform the necessary table join.
+     *
+     * @param string $column The column name to apply the filter condition to (e.g., "users.name")
+     * @param string $filter The filter condition in the format 'filterType_value'
+     *
+     * @return void
+     */
+    private function setJoinFilter(string $column, string $filter): void
+    {
+        $eColumn  = explode('.', $column);
+        $relation = $this->getRelation($eColumn[0]);
+
+        if ($relation) {
+            $joinable = $this->getJoinable();
+
+            if (!empty($eColumn[1]) && !empty($joinable[$eColumn[0]]['filterable']) && in_array($eColumn[1], $joinable[$eColumn[0]]['filterable'])) {
+
+                $this->join($eColumn[0]);
+
+                if ($this->joins) {
+                    $aliases = $this->getAliases($eColumn[0]);
+
+                    $filterColumn = $aliases[$eColumn[1]] ?? $relation[count($relation) - 1]['tables'][1] . '.' . $eColumn[1];
+
+                    $this->setFullFilter($filterColumn, $filter);
+                }
+            }
+        }
     }
 
     /**
@@ -155,22 +190,68 @@ trait Joinable
     private function setJoinSort(string $column, string $filter): void
     {
         $eColumn  = explode('.', $column);
-        $joinable = $this->getJoinable();
+        $relation = $this->getRelation($eColumn[0]);
 
-        if (!empty($eColumn[0]) && !empty($eColumn[1]) &&
-            !empty($joinable[$eColumn[0]]['rel']) &&
-            !empty($joinable[$eColumn[0]]['sortable']) &&
-            is_array($joinable[$eColumn[0]]['rel']) &&
-            is_array($joinable[$eColumn[0]]['sortable']) &&
-            in_array($eColumn[1], $joinable[$eColumn[0]]['sortable'])
-        ) {
-            $relation = $this->getRelation($joinable[$eColumn[0]]['rel']);
+        if ($relation) {
+            $joinable = $this->getJoinable();
 
-            $this->join($eColumn[0]);
+            if (!empty($eColumn[1]) && !empty($joinable[$eColumn[0]]['sortable']) && in_array($eColumn[1], $joinable[$eColumn[0]]['sortable'])) {
 
-            if ($this->joined) {
-                $this->orderBy($relation[count($relation) - 1]['tables'][1] . '.' . $eColumn[1], $filter);
+                $this->join($eColumn[0]);
+
+                if ($this->joins) {
+                    $aliases = $this->getAliases($eColumn[0]);
+
+                    $filterColumn = $aliases[$eColumn[1]] ?? $relation[count($relation) - 1]['tables'][1] . '.' . $eColumn[1];
+
+                    $this->orderBy($filterColumn, $filter);
+                }
             }
         }
     }
+
+    private function getAliases(string $relation)
+    {
+        if (isset($this->aliases[$relation])) {
+            return $this->aliases[$relation];
+        }
+
+        $aliases  = [];
+        $joinable = $this->getJoinable();
+
+        if (isset($joinable[$relation]['select']) && is_array($joinable[$relation]['select'])) {
+
+            foreach ($joinable[$relation]['select'] as $select) {
+                $select  = str_replace(' AS ', ' as ', $select);
+                $eSelect = explode(' as ', $select);
+                if (count($eSelect) == 2) {
+                    $aliases[$eSelect[1]] = $eSelect[0];
+                }
+            }
+
+            if ($aliases) {
+                $this->aliases[$relation] = $aliases;
+            }
+        }
+
+        return $aliases;
+    }
+
+    /**
+     * @param array $selects
+     * @return array
+     */
+    private function getMergedSelects(array $selects = []): array
+    {
+        foreach ($selects as $select) {
+            $select = str_replace(' AS ', ' as ', $select);
+
+            if (!in_array($select, $this->selects)) {
+                $this->selects[] = $select;
+            }
+        }
+
+        return $this->selects;
+    }
+
 }

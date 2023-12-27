@@ -30,7 +30,7 @@ trait Sortable
                 $column = $eSort[0];
                 if (isset($eSort[1]) && ($eSort[1] == 'ASC' || $eSort[1] == 'DESC')) {
                     if (in_array($column, $sortable)) {
-                        $this->orderBy($column, $eSort[1]);
+                        $this->orderBy($this->getColumn($column), $eSort[1]);
                     } else {
                         $this->setJoinSort($column, $eSort[1]);
                     }
