@@ -14,7 +14,8 @@ models. Aimed to abstract database layer complexity and allows you to standardiz
 - **Advanced Filtering**: Apply complex filtering logic including range and pattern matching.
 - **Dynamic Sorting**: Apply Order by multiple columns with different sorting strategies.
 - **Pagination**: Integrate Laravel's pagination with additional query features.
-- **Advanced Joining**: Easy defined relations without use model relations for joining
+- **Advanced Joining**: Easy defined relations without use model relations for joining.
+- **CRUD tools** : Easy implementation `CRUD` methods.
 
 ## Installation
 
@@ -24,8 +25,7 @@ To use this package, require it via Composer:
 composer require sajadsdi/laravel-repository
 ```
 
-After installing, you should extend the main `Repository` class for each Eloquent model you wish to create a repository
-for.
+After installing, you should extend the main `Repository` class in each repository that you wish to create a repository for Eloquent model.
 
 ## Usage
 
@@ -36,7 +36,7 @@ Create a new repository by extending the `Repository` class:
 ```php
 use Sajadsdi\LaravelRepository\Repository;
 
-class UserRepository extends Repository 
+class UserRepository extends Repository implements UserRepositoryInterface
 {
     // Implement abstract methods
 }
@@ -57,7 +57,7 @@ public function getSortable(): array;
 For example:
 
 ```php
-class UserRepository extends Repository 
+class UserRepository extends Repository implements UserRepositoryInterface
 {
     public function getModelName(): string 
     {
@@ -87,7 +87,7 @@ In your repository, it is possible to implement scope methods that are independe
 
 for example : 
 ```php
-class UserRepository extends Repository 
+class UserRepository extends Repository implements UserRepositoryInterface
 {
     // abstract methods...
     
@@ -115,6 +115,13 @@ class UserRepository extends Repository
 Execute search, sort, and filter operations:
 
 ```php
+
+//That's right, you need to inject your repository with the
+//interface in the controller or each class you need.
+
+//In this example, we create an instance of the repository
+//to convey the concept.
+//But it is not the right thing for real projects!
 $userRepo = new UserRepository();
 
 // Search by name or email
@@ -173,7 +180,7 @@ protected $joinable = [
             'table1.field1' => 'table2.field2',
             'table2.field3' => 'table3.field4',
         ],
-        'select'     => ['table1.*', 'table2.field_x as x', 'table3.field_y as y'],
+        'select'     => ['table2.field_x as x', 'table3.field_y as y'],
         'filterable' => ['x', 'y', 'field_z'],
         'sortable'   => ['x', 'y', 'field_z'],
         'soft_delete'=> ['table2', 'table3']
@@ -211,7 +218,8 @@ This pattern facilitates the creation of a series of joins, where `table1` is th
 Determine which columns to select from the joined tables. Aliases help distinguish between columns when names are shared across tables or when a more descriptive name is preferred.
 ```php
 'select' => [
-    'table1.*',  // All fields from primary table
+    // All visible fields from the main table are automatically selected.
+    
     'table2.field_x as x',  // Specific field with a clear alias
     'table3.field_y as y',  // Another field with its own alias
     // Add more fields and aliases accordingly
@@ -244,7 +252,7 @@ Specifies table, other than the base repository’s model table, that should exc
 ],
 ```
 This approach ensures a cohesive querying experience, allowing for powerful querying capabilities while respecting soft delete states.
-### Usage of filter and sort with `joinable` relationships
+#### Usage of filter and sort with `joinable` relationships
 
 Once you have defined your relationships in the `joinable` configuration, you can effortlessly filter and sort through related models using the `filter` and `sort` methods. Here's an example of how to use these methods to query user data with conditions and sorting:
 
@@ -265,12 +273,99 @@ $users = $userRepo->filter('relationName.x:is_null@relationName.y:lower_100')
 ```
 Make sure that your relations are properly defined in the joinable array and the associated fields are mentioned in filterable and sortable configurations. This ensures that the filtering and sorting logic is applied correctly across your database queries.
 
+### CRUD tools
+Methods used for CRUD operations are usually repeated in repositories! To prevent this repetition, you can use the interfaces and traits that are available in the package And if necessary, you can override the methods.
 
-#### More usage example :
-Suppose we define a repository as follows
+#### use `CrudRepositoryInterface` and `Crud` trait:
+These tools use for all `Read` and `Write` operations.
+You can implement crud interface in repository:
+```php
+class UserRepository extends Repository implements CrudRepositoryInterface,UserRepositoryInterface
+{
+    use Crud;
+    
+    // other methods...
+}
+```
+You can extend crud interface: 
 
 ```php
-class UserRepository extends Repository 
+interface UserRepositoryInterface extends CrudRepositoryInterface
+{
+    //you methods...
+}
+
+
+class UserRepository extends Repository implements UserRepositoryInterface
+{
+    use Crud;
+    
+    // other methods...
+}
+```
+Or you can create a base repository class to apply on all repositories.
+
+Of course, you can use the interfaces and traits that are special for write or read separately.
+```php
+interface UserReadRepositoryInterface extends ReadCrudRepositoryInterface
+{
+    //you methods...
+}
+
+
+class UserReadRepository extends Repository implements UserReadRepositoryInterface
+{
+    use ReadCrud;
+    
+    // other methods...
+}
+
+//OR
+
+interface UserWriteRepositoryInterface extends WriteCrudRepositoryInterface
+{
+    //you methods...
+}
+
+
+class UserWriteRepository extends Repository implements UserWriteRepositoryInterface
+{
+    use WriteCrud;
+    
+    // other methods...
+}
+```
+
+### Method Naming in Repository Classes
+When you need to define a method in your repository with the same name as an Eloquent method, use `$this->query()` to avoid conflicts. This approach allows you to safely leverage Eloquent’s functionality.
+
+For a create method:
+```php
+public function create(array $data)
+{
+    // Call the `create` method on the query builder provided by `$this->query()`
+    return $this->query()->create($data);
+}
+```
+This will use the query builder’s create method directly.
+
+
+### A simple implementation of repository pattern for Eloquent :
+Suppose we define a repository and interface as follows
+
+```php
+interface UserRepositoryInterface
+{
+    public function getAll(string $search = null, string $filter = null, string $sort = null, int $perPage = 15);
+    
+    public function getProfilePic(int $userId);
+    
+    public function getUserWithAllRelations(int $userId);
+}
+
+
+
+class UserRepository extends Repository implements UserRepositoryInterface
 {
 
     protected $joinable = [
@@ -278,7 +373,7 @@ class UserRepository extends Repository
             'rel' => [
                 'users.id' => 'user_activities.user_id',
             ],
-            'select'     => ['users.*', 'user_activities.created_at as activity_time', 'user_activities.type as activity_name'],
+            'select'     => ['user_activities.created_at as activity_time', 'user_activities.type as activity_name'],
             'filterable' => ['activity_time', 'activity_name'],
             'sortable'   => ['activity_time', 'activity_name'],
             'soft_delete'=> ['user_activities']
@@ -288,7 +383,7 @@ class UserRepository extends Repository
             'rel' => [
                 'users.pic_id' => 'user_pictures.id',
             ],
-            'select'     => ['users.*', 'user_pictures.path as photo'],
+            'select'     => ['user_pictures.path as photo'],
             'filterable' => ['photo'],
             'sortable'   => ['photo'],
             'soft_delete'=> ['user_pictures']
@@ -316,10 +411,14 @@ class UserRepository extends Repository
     }
 
     //you can use this method for index api on controller
-    //filter and sort methods call automatically join method if need. 
+    //if needed, filter and sort methods call automatically join method.
+    
     public function getAll(string $search = null, string $filter = null, string $sort = null, int $perPage = 15)
     {
         return $this->search($search)->filter($filter)->sort($sort)->paginate($perPage);
+        
+        // if you need join in all results,you can use `join` or `joins` in begin of the query like:
+        //return $this->joins(['activities','profile'])->search($search)->filter($filter)->... 
     }
     
     //you can use join method with relation name, without filter or sort method
@@ -333,19 +432,30 @@ class UserRepository extends Repository
     //You can use multiple join on relations defied on joinable, without filter or sort method
     public function getUserWithAllRelations(int $userId)
     {
-        return $this->join('activities')->join('profile')->find($userId);
+        return $this->joins(['activities','profile'])->find($userId);
     }
 }
 ```
+After defined repository and interface You need to bind these files in the `AppServiceProvider` :
+```php
+    public function register():void
+    {
+        //other bindings ...
+        //..
+        //.
+        $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
+    }
+```
+
 Now you can use this repository in your controller like below:
 
 ```php
 class UserController extends Controller
 {
 
-    private UserRepository $repo;
+    private UserRepositoryInterface $repo;
     
-    public function __construct(UserRepository $userRepo) 
+    public function __construct(UserRepositoryInterface $userRepo) 
     {
         $this->repo = $userRepo;
     }
@@ -372,18 +482,12 @@ http://127.0.0.1/api/v1/admin/users/?search=john&filter=id:upper_5@activities.ac
 ```
 This is very simple...
 
-### Method Naming in Repository Classes
-When you need to define a method in your repository with the same name as an Eloquent method, use `$this->query()` to avoid conflicts. This approach allows you to safely leverage Eloquent’s functionality.
+### Advanced implementation of repository pattern for Eloquent :
+Some individuals consider using the repository pattern for Eloquent Laravel to be superfluous or even mistaken. They argue that this pattern undermines SOLID principles, and indeed this is true.
 
-For a create method:
-```php
-public function create(array $data)
-{
-    // Call the `create` method on the query builder provided by `$this->query()`
-    return $this->query()->create($data);
-}
-```
-This will use the query builder’s create method directly.
+To implement this pattern for Eloquent, we must disregard the notion that “the ORM may change later.” The next step is to separate reads and writes! We do this by creating one repository for methods intended for reads and another for methods intended for writes.
+In this way, each repository is created for a specific purpose, and it also brings us benefits, one of which is:
+Imagine a project with a large scale where we need to separate database connections for reads and writes. With this pattern, it’s quite simple to define these connections within the repository itself so that each repository has its own corresponding connection!
 
 ### Contributing
 
