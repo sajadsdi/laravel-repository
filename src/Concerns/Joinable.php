@@ -2,6 +2,8 @@
 
 namespace Sajadsdi\LaravelRepository\Concerns;
 
+use Illuminate\Support\Facades\DB;
+
 trait Joinable
 {
     /**
@@ -48,7 +50,12 @@ trait Joinable
     {
         $joinable = $this->getJoinable();
 
+        if(!$joinable){
+            return $this;
+        }
+
         $rels  = $this->getRelation($relation);
+
         $count = count($rels);
 
         if ($count >= 1) {
@@ -210,7 +217,13 @@ trait Joinable
         }
     }
 
-    private function getAliases(string $relation)
+    /**
+     * Get defined aliases.
+     *
+     * @param string $relation
+     * @return array
+     */
+    private function getAliases(string $relation): array
     {
         if (isset($this->aliases[$relation])) {
             return $this->aliases[$relation];
@@ -238,20 +251,80 @@ trait Joinable
     }
 
     /**
+     * Get selected columns merged with old selected columns.
+     *
      * @param array $selects
      * @return array
      */
     private function getMergedSelects(array $selects = []): array
     {
-        foreach ($selects as $select) {
-            $select = str_replace(' AS ', ' as ', $select);
+        $this->setModelSelects();
 
-            if (!in_array($select, $this->selects)) {
-                $this->selects[] = $select;
-            }
+        foreach ($selects as $select) {
+            $this->setSelect(str_replace(' AS ', ' as ', $select));
         }
 
         return $this->selects;
+    }
+
+    /**
+     * Set a column on selected columns.
+     *
+     * @param mixed $select
+     * @return void
+     */
+    private function setSelect(mixed $select): void
+    {
+        if (!in_array($select, $this->selects)) {
+            $this->selects[] = $select;
+        }
+    }
+
+    /**
+     * Get base table visible columns.
+     *
+     * @return array
+     */
+    protected function getModelSelects(): array
+    {
+        $table         = $this->model()->getTable();
+        $visibleColumn = array_diff(DB::getSchemaBuilder()->getColumnListing($table), $this->model()->getHidden(), ['deleted_at']);
+        $cols          = [];
+
+        foreach ($visibleColumn as $col) {
+            $cols[] = $table . '.' . $col;
+        }
+
+        return $cols;
+    }
+
+    /**
+     * Set base table select columns.
+     *
+     * @return void
+     */
+    protected function setModelSelects(): void
+    {
+        if (!$this->selects) {
+            $this->selects = $this->getModelSelects();
+        }
+    }
+
+    /**
+     * Apply multiple joins on query.
+     *
+     * @param array $relations
+     * @return $this
+     */
+    public function joins(array $relations): static
+    {
+        foreach ($relations as $relation) {
+            if (is_string($relation)) {
+                $this->join($relation);
+            }
+        }
+
+        return $this;
     }
 
 }
