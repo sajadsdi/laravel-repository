@@ -76,7 +76,8 @@ trait Joinable
                     $query->join($rels[$i]['tables'][1],
                         $rels[$i]['tables'][0] . '.' . $rels[$i]['keys'][0],
                         '=',
-                        $rels[$i]['tables'][1] . '.' . $rels[$i]['keys'][1]
+                        $rels[$i]['tables'][1] . '.' . $rels[$i]['keys'][1],
+                        $joinable[$relation]['join_type'] ?? 'inner'
                     );
 
                     $softDelete = $joinable[$relation]['soft_delete'] ?? [];
