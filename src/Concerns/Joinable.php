@@ -277,7 +277,7 @@ trait Joinable
     private function setSelect(mixed $select): void
     {
         if (!in_array($select, $this->selects)) {
-            $this->selects[] = $select;
+            $this->selects[] = DB::raw($select);
         }
     }
 
