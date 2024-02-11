@@ -28,7 +28,14 @@ trait Sortable
             foreach ($sorts as $i => $sort) {
                 $eSort  = explode(':', $sort, 2);
                 $column = $eSort[0];
-                if (isset($eSort[1]) && ($eSort[1] == 'ASC' || $eSort[1] == 'DESC')) {
+
+                if(!isset($eSort[1])){
+                    return $this;
+                }
+
+                $eSort[1] = strtoupper($eSort[1]);
+
+                if ($eSort[1] == 'ASC' || $eSort[1] == 'DESC') {
                     if (in_array($column, $sortable)) {
                         $this->orderBy($this->getColumn($column), $eSort[1]);
                     } else {
