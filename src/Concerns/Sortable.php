@@ -4,6 +4,7 @@ namespace Sajadsdi\LaravelRepository\Concerns;
 
 trait Sortable
 {
+    use Joinable;
 
     /**
      * Sort query string for sorting the list of models.

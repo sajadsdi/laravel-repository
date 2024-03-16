@@ -4,6 +4,7 @@ namespace Sajadsdi\LaravelRepository\Concerns;
 
 trait Filterable
 {
+    use Joinable;
 
     /**
      * Filter query string for advanced filtering options.
