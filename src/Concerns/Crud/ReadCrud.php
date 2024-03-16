@@ -26,6 +26,6 @@ trait ReadCrud
      */
     public function index(string $search = null, string $filter = null, string $sort = null, int $perPage = 15): array
     {
-        return $this->search($search)->filter($filter)->sort($sort)->paginate($perPage)->toArray();
+        return $this->search($search)->filter($filter)->sort($sort)->simplePaginate($perPage)->toArray();
     }
 }

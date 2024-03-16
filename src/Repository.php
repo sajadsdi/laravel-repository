@@ -3,6 +3,7 @@
 namespace Sajadsdi\LaravelRepository;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -181,6 +182,17 @@ abstract class Repository
     public function paginate(int $perPage = 15): LengthAwarePaginator
     {
         return $this->query()->paginate($perPage)->appends(['search' => $this->search, 'filter' => $this->filter, 'sort' => $this->sort]);
+    }
+
+    /**
+     * Paginate the given query into a simple paginator.
+     * @param int $perPage The number of items per page
+     *
+     * @return Paginator The paginator instance
+     */
+    public function simplePaginate(int $perPage = 15): Paginator
+    {
+        return $this->query()->simplePaginate($perPage)->appends(['search' => $this->search, 'filter' => $this->filter, 'sort' => $this->sort]);
     }
 
 
