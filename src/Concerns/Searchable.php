@@ -21,9 +21,17 @@ trait Searchable
         if ($search) {
             $this->search = $search;
 
-            foreach ($this->getSearchable() as $column) {
-                $this->orWhere($column, 'LIKE', "%" . $search . "%");
-            }
+            $searchable = $this->getSearchable();
+
+            $this->where(function ($query) use ($search, $searchable) {
+                for ($i = 0; $i < count($searchable); $i++) {
+                    if($i == 0) {
+                        $query = $query->where($searchable[$i], 'LIKE', "%" . $search . "%");
+                    }else{
+                        $query = $query->orWhere($searchable[$i], 'LIKE', "%" . $search . "%");
+                    }
+                }
+            });
         }
 
         return $this;
