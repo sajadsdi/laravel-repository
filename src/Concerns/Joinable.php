@@ -50,11 +50,11 @@ trait Joinable
     {
         $joinable = $this->getJoinable();
 
-        if(!$joinable){
+        if (!$joinable) {
             return $this;
         }
 
-        $rels  = $this->getRelation($relation);
+        $rels = $this->getRelation($relation);
 
         $count = count($rels);
 
@@ -74,9 +74,9 @@ trait Joinable
                     $this->joins[] = $rels[$i]['tables'][1];
 
                     $query->join($rels[$i]['tables'][1],
-                        $rels[$i]['tables'][0] . '.' . $rels[$i]['keys'][0],
+                        $this->getTableAlias($rels[$i]['tables'][0]) . '.' . $rels[$i]['keys'][0],
                         '=',
-                        $rels[$i]['tables'][1] . '.' . $rels[$i]['keys'][1],
+                        $this->getTableAlias($rels[$i]['tables'][1]) . '.' . $rels[$i]['keys'][1],
                         $joinable[$relation]['join_type'] ?? 'inner'
                     );
 
@@ -140,7 +140,7 @@ trait Joinable
                 if (!empty($eTable1[0]) && !empty($eTable1[1]) && !empty($eTable2[0]) && !empty($eTable2[1])) {
                     $relation[] = [
                         'tables' => [$eTable1[0], $eTable2[0]],
-                        'keys'   => [$eTable1[1], $eTable2[1]]
+                        'keys' => [$eTable1[1], $eTable2[1]]
                     ];
                 }
             }
@@ -165,14 +165,13 @@ trait Joinable
      */
     private function setJoinFilter(string $column, string $filter): void
     {
-        $eColumn  = explode('.', $column);
+        $eColumn = explode('.', $column);
         $relation = $this->getRelation($eColumn[0]);
 
         if ($relation) {
             $joinable = $this->getJoinable();
 
             if (!empty($eColumn[1]) && !empty($joinable[$eColumn[0]]['filterable']) && in_array($eColumn[1], $joinable[$eColumn[0]]['filterable'])) {
-
                 $this->join($eColumn[0]);
 
                 if ($this->joins) {
@@ -197,7 +196,7 @@ trait Joinable
      */
     private function setJoinSort(string $column, string $filter): void
     {
-        $eColumn  = explode('.', $column);
+        $eColumn = explode('.', $column);
         $relation = $this->getRelation($eColumn[0]);
 
         if ($relation) {
@@ -230,13 +229,13 @@ trait Joinable
             return $this->aliases[$relation];
         }
 
-        $aliases  = [];
+        $aliases = [];
         $joinable = $this->getJoinable();
 
         if (isset($joinable[$relation]['select']) && is_array($joinable[$relation]['select'])) {
 
             foreach ($joinable[$relation]['select'] as $select) {
-                $select  = str_replace(' AS ', ' as ', $select);
+                $select = str_replace(' AS ', ' as ', $select);
                 $eSelect = explode(' as ', $select);
                 if (count($eSelect) == 2) {
                     $aliases[$eSelect[1]] = $eSelect[0];
@@ -288,9 +287,9 @@ trait Joinable
      */
     protected function getModelSelects(): array
     {
-        $table         = $this->model()->getTable();
+        $table = $this->model()->getTable();
         $visibleColumn = array_diff(DB::getSchemaBuilder()->getColumnListing($table), $this->model()->getHidden(), ['deleted_at']);
-        $cols          = [];
+        $cols = [];
 
         foreach ($visibleColumn as $col) {
             $cols[] = $table . '.' . $col;
@@ -326,6 +325,18 @@ trait Joinable
         }
 
         return $this;
+    }
+
+    private function getTableAlias(string $tableWithAlias)
+    {
+        $as = explode(':', str_replace([' as ', ' AS '], ':', $tableWithAlias));
+        $count = count($as);
+
+        if ($count == 1) {
+            return $as[0];
+        }
+
+        return $as[$count - 1];
     }
 
 }
