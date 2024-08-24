@@ -83,7 +83,7 @@ abstract class Repository
     private function model(): Model
     {
         if (!(isset($this->model) && $this->model)) {
-            $name        = $this->getModelName();
+            $name = $this->getModelName();
             $this->model = new $name();
         }
         return $this->model;
@@ -143,8 +143,8 @@ abstract class Repository
      */
     protected function resetQuery(): void
     {
-        $this->query   = null;
-        $this->joins   = [];
+        $this->query = null;
+        $this->joins = [];
         $this->selects = [];
     }
 
@@ -176,23 +176,30 @@ abstract class Repository
     /**
      * Paginates the result set according to the given page size.
      * @param int $perPage The number of items per page
+     * @param int $columns The selected columns
+     * @param int $pageName The page name
+     * @param int $page The current page
+     * @param int $total use if need disable count query
      *
      * @return LengthAwarePaginator The paginator instance
      */
-    public function paginate(int $perPage = 15): LengthAwarePaginator
+    public function paginate($perPage = 15, $columns = ['*'], $pageName = 'page', $page = null, $total = null): LengthAwarePaginator
     {
-        return $this->query()->paginate($perPage)->appends(['search' => $this->search, 'filter' => $this->filter, 'sort' => $this->sort]);
+        return $this->query()->paginate($perPage, $columns, $pageName, $page, $total)->appends(['search' => $this->search, 'filter' => $this->filter, 'sort' => $this->sort]);
     }
 
     /**
      * Paginate the given query into a simple paginator.
      * @param int $perPage The number of items per page
+     * @param int $columns The selected columns
+     * @param int $pageName The page name
+     * @param int $page The current page
      *
      * @return Paginator The paginator instance
      */
-    public function simplePaginate(int $perPage = 15): Paginator
+    public function simplePaginate($perPage = 15, $columns = ['*'], $pageName = 'page', $page = null): Paginator
     {
-        return $this->query()->simplePaginate($perPage)->appends(['search' => $this->search, 'filter' => $this->filter, 'sort' => $this->sort]);
+        return $this->query()->simplePaginate($perPage, $columns, $pageName, $page)->appends(['search' => $this->search, 'filter' => $this->filter, 'sort' => $this->sort]);
     }
 
 
